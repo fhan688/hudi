@@ -179,7 +179,7 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
    * @param throwable
    */
   protected void ignoreWriteFailed(Throwable throwable) {
-    if (config.getIgnoreWriteFailed()) {
+    if (!config.getIgnoreWriteFailed()) {
       throw new HoodieException(throwable.getMessage(), throwable);
     }
   }
