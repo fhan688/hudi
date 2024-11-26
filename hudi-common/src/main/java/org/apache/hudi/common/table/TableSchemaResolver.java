@@ -107,6 +107,12 @@ public class TableSchemaResolver {
     this.hasOperationField = Lazy.lazily(this::hasOperationField);
   }
 
+  public TableSchemaResolver(HoodieTableMetaClient metaClient, boolean withOperationField) {
+    this.metaClient = metaClient;
+    this.commitMetadataCache = Lazy.lazily(() -> new ConcurrentHashMap<>(2));
+    this.hasOperationField = Lazy.lazily(() -> withOperationField);
+  }
+
   public Schema getTableAvroSchemaFromDataFile() throws Exception {
     return getTableAvroSchemaFromDataFileInternal().orElseThrow(schemaNotFoundError());
   }

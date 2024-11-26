@@ -2235,6 +2235,36 @@ public class ITTestHoodieDataSource {
   }
 
   @ParameterizedTest
+  @MethodSource("testWriteAndReadWithOperationField")
+  void testWriteAndReadWithOperationField(String tableType, boolean writeWithOperationField, boolean readWithOperationField) throws Exception {
+    // create catalog db table, set writeWithOperationField
+    String createSource = TestConfigurations.getFileSourceDDL("source");
+    streamTableEnv.executeSql(createSource);
+    HoodieHiveCatalog hoodieCatalog = HoodieCatalogTestUtils.createHiveCatalog("test_catalog");
+    streamTableEnv.registerCatalog("test_catalog", hoodieCatalog);
+    String hoodieDatabaseDDL = "create database if not exists test_catalog.test_database";
+    streamTableEnv.executeSql(hoodieDatabaseDDL);
+    String hoodieTableDDL = sql("test_catalog.test_database.t1")
+        .option(FlinkOptions.TABLE_TYPE, tableType)
+        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
+        .option(FlinkOptions.CHANGELOG_ENABLED, writeWithOperationField)
+        .end();
+    streamTableEnv.executeSql(hoodieTableDDL);
+    // insert data
+    String insertInto = "insert into test_catalog.test_database.t1 select * from source";
+    execInsertSql(streamTableEnv, insertInto);
+
+    // stream read table from firstCommit, set readWithOperationField by SQLHint
+    String firstCommit = TestUtils.getFirstCompleteInstant(tempFile.getAbsolutePath());
+    String query = String.format("select * from test_catalog.test_database.t1/*+ OPTIONS('%s'='%s','%s'='%s','%s'='%s') */",
+        FlinkOptions.CHANGELOG_ENABLED.key(), readWithOperationField, FlinkOptions.READ_AS_STREAMING.key(), true, FlinkOptions.READ_START_COMMIT.key(), firstCommit);
+    List<Row> rows = execSelectSql(streamTableEnv, query, 10);
+
+    // check whether different table types and operationFiled settings blocks reading data
+    assertRowsEquals(rows, TestData.DATA_SET_SOURCE_INSERT);
+  }
+
+  @ParameterizedTest
   @MethodSource("tableTypeAndBooleanTrueFalseParams")
   void testDynamicPartitionPrune(HoodieTableType tableType, boolean hiveStylePartitioning) throws Exception {
     Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
@@ -2416,6 +2446,15 @@ public class ITTestHoodieDataSource {
             {"BUCKET", HoodieTableType.COPY_ON_WRITE},
             {"BUCKET", HoodieTableType.MERGE_ON_READ}};
     return Stream.of(data).map(Arguments::of);
+  }
+
+  private static Stream<Arguments> testWriteAndReadWithOperationField() {
+    return Arrays.stream(new Object[][] {
+        {HoodieTableType.MERGE_ON_READ.name(), true, true},   {HoodieTableType.MERGE_ON_READ.name(), false, false},
+        {HoodieTableType.MERGE_ON_READ.name(), true, false},   {HoodieTableType.MERGE_ON_READ.name(), false, true},
+        {HoodieTableType.COPY_ON_WRITE.name(), true, true},   {HoodieTableType.COPY_ON_WRITE.name(), false, false},
+        {HoodieTableType.COPY_ON_WRITE.name(), true, false},   {HoodieTableType.COPY_ON_WRITE.name(), false, true}
+    }).map(Arguments::of);
   }
 
   private void execInsertSql(TableEnvironment tEnv, String insert) {
