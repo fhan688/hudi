@@ -38,7 +38,7 @@ class ArchiveCommitsProcedure extends BaseProcedure
     ProcedureParameter.optional(2, "min_commits", DataTypes.IntegerType, 20),
     ProcedureParameter.optional(3, "max_commits", DataTypes.IntegerType, 30),
     ProcedureParameter.optional(4, "retain_commits", DataTypes.IntegerType, 10),
-    ProcedureParameter.optional(5, "enable_metadata", DataTypes.BooleanType, false),
+    ProcedureParameter.optional(5, "enable_metadata", DataTypes.BooleanType, true),
     // params => key=value, key2=value2
     ProcedureParameter.optional(6, "options", DataTypes.StringType, None)
   )
