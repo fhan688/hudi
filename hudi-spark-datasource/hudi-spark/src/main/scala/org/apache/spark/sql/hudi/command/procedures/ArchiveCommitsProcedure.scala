@@ -19,12 +19,14 @@ package org.apache.spark.sql.hudi.command.procedures
 
 import org.apache.hudi.SparkAdapterSupport
 import org.apache.hudi.cli.ArchiveExecutorUtils
+import org.apache.hudi.common.util.StringUtils
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
 import java.util.function.Supplier
+import scala.collection.JavaConverters._
 
 class ArchiveCommitsProcedure extends BaseProcedure
   with ProcedureBuilder
@@ -36,7 +38,9 @@ class ArchiveCommitsProcedure extends BaseProcedure
     ProcedureParameter.optional(2, "min_commits", DataTypes.IntegerType, 20),
     ProcedureParameter.optional(3, "max_commits", DataTypes.IntegerType, 30),
     ProcedureParameter.optional(4, "retain_commits", DataTypes.IntegerType, 10),
-    ProcedureParameter.optional(5, "enable_metadata", DataTypes.BooleanType, true)
+    ProcedureParameter.optional(5, "enable_metadata", DataTypes.BooleanType, false),
+    // params => key=value, key2=value2
+    ProcedureParameter.optional(6, "options", DataTypes.StringType, None)
   )
 
   private val OUTPUT_TYPE = new StructType(Array[StructField](
@@ -57,6 +61,19 @@ class ArchiveCommitsProcedure extends BaseProcedure
     val maxCommits = getArgValueOrDefault(args, PARAMETERS(3)).get.asInstanceOf[Int]
     val retainCommits = getArgValueOrDefault(args, PARAMETERS(4)).get.asInstanceOf[Int]
     val enableMetadata = getArgValueOrDefault(args, PARAMETERS(5)).get.asInstanceOf[Boolean]
+    val options = getArgValueOrDefault(args, PARAMETERS(6))
+    var conf: Map[String, String] = Map.empty
+
+    options match {
+      case Some(p) =>
+        val paramPairs = StringUtils.split(p.asInstanceOf[String], ",").asScala
+        paramPairs.foreach { pair =>
+          val values = StringUtils.split(pair, "=")
+          conf = conf ++ Map(values.get(0).trim -> values.get(1).trim)
+        }
+      case _ =>
+        logInfo("No options")
+    }
 
     val basePath = getBasePath(tableName, tablePath)
 
@@ -65,7 +82,8 @@ class ArchiveCommitsProcedure extends BaseProcedure
       maxCommits,
       retainCommits,
       enableMetadata,
-      basePath)))
+      basePath,
+      conf.asJava)))
   }
 
   override def build = new ArchiveCommitsProcedure()

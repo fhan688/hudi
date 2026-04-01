@@ -67,6 +67,31 @@ class TestArchiveCommitsProcedure extends HoodieSparkProcedureTestBase {
       assertResult(4) {
         archivedCommits.length
       }
+
+      spark.sql(s"insert into $tableName values(1, 'a1', 10, 1000)")
+      spark.sql(s"insert into $tableName values(2, 'a2', 20, 2000)")
+      spark.sql(s"insert into $tableName values(3, 'a3', 30, 3000)")
+
+      // test options
+      val result2 = spark.sql(s"call archive_commits(table => '$tableName'" +
+          s", retain_commits => 1, options => 'hoodie.keep.min.commits = 2, hoodie.keep.max.commits=3, hoodie.commits.archival.batch=1')")
+        .collect()
+        .map(row => Seq(row.getInt(0)))
+      assertResult(1)(result2.length)
+      assertResult(0)(result2(0).head)
+
+      // collect active commits for table
+      val commits2 = spark.sql(s"""call show_commits(table => '$tableName', limit => 10)""").collect()
+      assertResult(3) {
+        commits2.length
+      }
+
+      // collect archived commits for table
+      val endTs2 = commits2(0).get(0).toString
+      val archivedCommits2 = spark.sql(s"""call show_archived_commits(table => '$tableName', end_ts => '$endTs2')""").collect()
+      assertResult(6) {
+        archivedCommits2.length
+      }
     }
   }
 }
