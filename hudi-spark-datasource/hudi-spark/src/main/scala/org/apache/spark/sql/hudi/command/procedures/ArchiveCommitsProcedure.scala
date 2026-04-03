@@ -26,7 +26,7 @@ import org.apache.spark.sql.types._
 
 import java.util.function.Supplier
 
-import scala.jdk.CollectionConverters.mapAsJavaMapConverter
+import scala.collection.JavaConverters._
 
 class ArchiveCommitsProcedure extends BaseProcedure
   with ProcedureBuilder
